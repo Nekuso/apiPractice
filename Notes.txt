@@ -1,0 +1,137 @@
+Making an API
+
+//Make project testAPI
+composer createproject laravel/laravel .
+
+//Make sure Postman is open so we ca mess around with the API requests later
+
+//Make sure to configure Database
+.env
+
+//Make the Product model and migration for products table
+php artisan make:model Product -migration
+
+//Make the products migration fields
+Schema::create('products', function (Blueprint $table) {
+    $table->id();
+    $table->string('name');
+    $table->string('slug'); //slug is a url friendly version of the name
+    $table->string('description');
+    $table->decimal('price', 5, 2); //5 digits, 2 decimal places
+    $table->timestamps();
+});
+
+//Migrate the table to database
+php artisan migrate
+
+//Add the protected property and fillable property to the Product model
+protected $fillable = ['name', 'slug', 'description', 'price'];
+
+
+//Make the ProductController
+php artisan make:controller ProductController --api //Makes our shell methods for us
+
+//Add the model on our ProductController
+use App\Models\Product;
+
+//Add the ProductController on our api.php
+use App\Http\Controllers\ProductController;
+
+//Add resource route on our api.php for simplicity so we can use all the crud or shell methods
+Route::resource('products', ProductController::class);
+
+//We can check our routes by doing
+php artisan route:list
+
+//Make our crud methods on our ProductController
+public function index()
+{
+    return Product::all();
+}
+
+/**
+* Store a newly created resource in storage.
+*/
+public function store(Request $request)
+{
+    $request->validate([
+        'name' => 'required',
+        'slug' => 'required',
+        'price' => 'required',
+    ]);
+
+    return Product::create($request->all());
+}
+
+/**
+* Display the specified resource.
+*/
+public function show(string $id)
+{
+    return Product::find($id);
+}
+
+/**
+* Update the specified resource in storage.
+*/
+public function update(Request $request, string $id)
+{
+    $product = Product::find($id);
+    $product->update($request->all());
+
+    return $product;
+}
+
+/**
+* Remove the specified resource from storage.
+*/
+public function destroy(string $id)
+{
+    return Product::destroy($id);
+}
+
+/**
+* Search for a name
+*/
+public function search(string $name)
+{
+    return Product::where('name', 'like', '%'.$name.'%')->get();
+}
+
+//We can add a specific search route
+Route::get('products/search/{name}', [ProductController::class, 'search']);
+
+//We can add a specific search method
+public function search(string $name)
+{
+    return Product::where('name', 'like', '%'.$name.'%')->get();
+}
+
+//We can test our API by using Postman
+
+//We must have authentication and so we requre Sanctum
+composer require laravel/sanctum 
+
+
+//We must publish the Sanctum configuration and migration files
+php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
+
+//We must migrate the database
+php artisan migrate
+
+//We must add sanctum middleware on our api.php on our kernel or replace the api
+'api' => [
+    \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+    \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
+    \Illuminate\Routing\Middleware\SubstituteBindings::class,
+],
+
+// To begin issuing tokens for users, your User model should use the Laravel\Sanctum\HasApiTokens trait:
+use Laravel\Sanctum\HasApiTokens;
+
+use HasApiTokens, HasFactory, Notifiable, HasApiTokens;
+
+//We must add middleware to protect our routes on api.php
+Route::group(['middleware' => ['auth:sanctum']], function () {
+    Route::get('/products/search/{name}', [ProductController::class, 'search']);
+});
